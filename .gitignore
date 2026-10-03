@@ -1,0 +1,42 @@
+# Python Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+.streamlit/secrets.toml
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Multi-Tenant User Data & Local Caches (keep directory structure with .gitkeep)
+data/papers/*
+!data/papers/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/chunks/*
+!data/chunks/.gitkeep
+data/chroma_db/*
+!data/chroma_db/.gitkeep
+data/users/*
+!data/users/.gitkeep
+data/evaluations/*
+!data/evaluations/.gitkeep
+data/logs/*
+!data/logs/.gitkeep
