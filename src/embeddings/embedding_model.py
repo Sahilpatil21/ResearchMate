@@ -44,11 +44,13 @@ class EmbeddingModel:
         """Lazy-load the SentenceTransformer model on first usage."""
         if self._model is None:
             try:
-                from sentence_transformers import SentenceTransformer
                 import torch
+                torch.set_num_threads(1)
+                from sentence_transformers import SentenceTransformer
 
                 device = "cuda" if torch.cuda.is_available() else "cpu"
                 self._model = SentenceTransformer(self.model_name, device=device)
+                self._model.eval()
                 if hasattr(self._model, "get_embedding_dimension"):
                     self._dimension = self._model.get_embedding_dimension()
                 else:

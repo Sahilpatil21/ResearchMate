@@ -41,16 +41,17 @@ class CrossEncoderReranker:
         if cls._instance is None or (model_name and cls._instance.model_name != model_name):
             cls._instance = cls(model_name)
         return cls._instance
-
     def _load_model(self) -> None:
         """Lazy-load the CrossEncoder model on first inference request."""
         if self._model is None:
             try:
                 import torch
+                torch.set_num_threads(1)
                 from sentence_transformers import CrossEncoder
 
                 device = "cuda" if torch.cuda.is_available() else "cpu"
                 self._model = CrossEncoder(self.model_name, device=device)
+                self._model.model.eval()
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to load CrossEncoder model '{self.model_name}': {e}"
