@@ -125,7 +125,15 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Launch Streamlit Web Dashboard
+### 2. Launch ResearchMate Web Application
+
+#### Option A: High-Performance FastAPI & Modern SPA Dashboard (Recommended)
+```powershell
+python server.py
+```
+Open your browser at `http://localhost:8000`.
+
+#### Option B: Classic Streamlit Dashboard
 ```powershell
 streamlit run app.py
 ```
@@ -133,7 +141,7 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 🧪 Automated Testing Suite (94 / 94 Tests Passed — 100% Pass Rate)
+## 🧪 Automated Testing Suite (105 / 105 Tests Passed — 100% Pass Rate)
 
 Run the full automated pytest suite across all test modules:
 
@@ -142,6 +150,7 @@ pytest -v
 ```
 
 ### Test Coverage Summary:
+- ✅ **FastAPI Server & REST APIs (11 tests)** (`test_server.py`): SPA hosting, registration, login, auth profile, logout, dashboard statistics, paper listing & details, PDF upload & indexing, deletion, grounded RAG chat, academic summarization, multi-paper comparison, research gap analysis, literature reviews, evaluation benchmarking, human feedback ratings, diagnostics.
 - ✅ **Cloudinary Cloud Storage (7 tests)** (`test_cloudinary_storage.py`): Upload, download, deletion, secure URLs, public_id generation, secret redaction, migration manager.
 - ✅ **Multi-Tenant Security (7 tests)** (`test_security_multitenant.py`): Cross-user retrieval prevention, cross-user download prevention, cross-user deletion prevention, RAG query isolation, cross-user comparison prevention, document_id tampering prevention, public_id tampering prevention.
 - ✅ **Storage & MongoDB Atlas (5 tests)** (`test_storage.py`): Documents, chunks, summaries, comparisons, and chat history persistence.

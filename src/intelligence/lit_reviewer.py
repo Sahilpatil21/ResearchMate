@@ -44,6 +44,24 @@ class LiteratureReviewReport(BaseModel):
     references_markdown: str = Field(..., description="10. References")
     citations: List[Citation] = Field(default_factory=list, description="Extracted source citations")
 
+    @property
+    def title(self) -> str:
+        """Alias for topic."""
+        return self.topic
+
+    @property
+    def full_text(self) -> str:
+        """Return formatted markdown of the complete literature review."""
+        return self.to_markdown()
+
+    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+        """Provide extra helper keys for API compatibility."""
+        data = super().model_dump(**kwargs)
+        data["title"] = self.title
+        data["full_text"] = self.full_text
+        data["markdown"] = self.full_text
+        return data
+
     def to_markdown(self) -> str:
         """Render complete literature review report into publication-ready Markdown."""
         lines = [
@@ -120,27 +138,36 @@ class LiteratureReviewGenerator:
 
     def generate_review(
         self,
-        document_ids: List[str],
+        document_ids: Optional[List[str]] = None,
         topic_focus: Optional[str] = None,
+        topic: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> LiteratureReviewReport:
         """Generate structured literature review across selected documents.
 
         Args:
-            document_ids: List of document IDs to include.
+            document_ids: Optional list of document IDs to include (defaults to all user documents).
             topic_focus: Optional focus query / theme.
+            topic: Optional alias for topic_focus.
             user_id: Optional user identifier for multi-tenant isolation.
 
         Returns:
             LiteratureReviewReport instance.
         """
-        focus_title = topic_focus or "Synthesized Analysis of Selected Research Papers"
+        raw_topic = topic_focus or topic or ""
+        focus_title = raw_topic.strip() if raw_topic.strip() else "Synthesized Analysis of Selected Research Papers"
+
+        # Resolve document_ids if not provided
+        if not document_ids:
+            from src.utils.file_utils import load_all_processed_documents
+            all_docs = load_all_processed_documents(user_id=user_id)
+            document_ids = [d.document_id for d in all_docs]
 
         if not document_ids:
             return LiteratureReviewReport(
                 topic=focus_title,
                 document_ids=[],
-                introduction="No papers selected.",
+                introduction="No papers found in your library for literature review. Please upload research papers first.",
                 research_area_overview="N/A",
                 existing_approaches="N/A",
                 methodology_comparison="N/A",
@@ -152,6 +179,7 @@ class LiteratureReviewGenerator:
                 references_markdown="_No references available._",
                 citations=[],
             )
+
 
         queries = [
             f"Introduction, background, research area overview, and motivation in {focus_title}",

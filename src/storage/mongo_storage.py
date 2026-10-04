@@ -331,6 +331,27 @@ class MongoStorageService:
                 return False
         return False
 
+    def load_chunks(self, document_id: str, user_id: Optional[str] = None) -> List[Chunk]:
+        """Load chunks from MongoDB Atlas, falling back to local storage."""
+        if self.is_connected and self._db is not None:
+            try:
+                uid = user_id or "default"
+                cursor = self._db["chunks"].find({"user_id": uid, "document_id": document_id}).sort("chunk_index", 1)
+                chunks = []
+                for doc in cursor:
+                    doc.pop("_id", None)
+                    doc.pop("user_id", None)
+                    chunks.append(Chunk.from_dict(doc))
+                if chunks:
+                    return chunks
+            except Exception:
+                pass
+        return load_local_chunks(document_id, user_id=user_id)
+
+    def load_document_chunks(self, document_id: str, user_id: Optional[str] = None) -> List[Chunk]:
+        """Alias for load_chunks."""
+        return self.load_chunks(document_id=document_id, user_id=user_id)
+
     # -----------------------------------------------------------------
     # RESEARCH INTELLIGENCE (SUMMARIES & COMPARISONS)
     # -----------------------------------------------------------------
@@ -375,6 +396,10 @@ class MongoStorageService:
             except Exception:
                 pass
         return None
+
+    def load_summary(self, document_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Alias for get_summary."""
+        return self.get_summary(document_id=document_id, user_id=user_id)
 
     def save_comparison(
         self,
@@ -426,8 +451,10 @@ class MongoStorageService:
         content: str,
         citations: Optional[List[Dict[str, Any]]] = None,
         filter_document_id: Optional[str] = None,
+        document_id: Optional[str] = None,
     ) -> bool:
         """Save a single user/assistant chat turn to MongoDB Atlas."""
+        doc_id = document_id or filter_document_id
         if self.is_connected and self._db is not None:
             try:
                 entry = {
@@ -435,7 +462,8 @@ class MongoStorageService:
                     "role": role,
                     "content": content,
                     "citations": citations or [],
-                    "filter_document_id": filter_document_id,
+                    "document_id": doc_id,
+                    "filter_document_id": doc_id,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
                 self._db["chat_history"].insert_one(entry)

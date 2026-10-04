@@ -14,7 +14,7 @@ class User(BaseModel):
     user_id: str = Field(default_factory=lambda: f"usr_{uuid.uuid4().hex[:12]}")
     email: str
     full_name: str
-    password_hash: str
+    password_hash: str = Field(default="")
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     last_login: Optional[str] = None
 
@@ -30,6 +30,10 @@ class User(BaseModel):
         if include_hash:
             d["password_hash"] = self.password_hash
         return d
+
+    def to_safe_dict(self) -> Dict[str, Any]:
+        """Convert User instance to safe dictionary without password_hash."""
+        return self.to_dict(include_hash=False)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> User:

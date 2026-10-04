@@ -73,6 +73,27 @@ class ExperimentLogger:
 
         return record
 
+    def log_retrieval_experiment(
+        self,
+        report: Any,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Record a retrieval benchmarking experiment run."""
+        report_dict = report.model_dump() if hasattr(report, "model_dump") else (report if isinstance(report, dict) else {})
+        record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "retrieval_benchmark",
+            "top_k": getattr(report, "top_k", 5),
+            "method_summaries": report_dict.get("method_summaries", {}),
+            "notes": notes or "",
+        }
+        try:
+            with open(self.experiments_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+        return record
+
     def log_human_rating(self, rating: HumanEvaluationRating) -> None:
         """Persist a human evaluation rating record."""
         record = rating.model_dump()

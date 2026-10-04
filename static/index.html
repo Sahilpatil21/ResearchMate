@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ResearchMate - AI Research Assistant & Literature Intelligence</title>
+  <meta name="description" content="Grounded AI-powered research paper analysis, multi-paper comparisons, research gap discovery, and academic literature reviews." />
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS v3.4 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+              950: '#1e1b4b',
+            },
+            dark: {
+              bg: '#090d16',
+              surface: '#0f172a',
+              card: '#1e293b',
+              border: '#334155',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js for fast Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify for XSS sanitation -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+  <!-- Chart.js for benchmark visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body class="bg-[#f8fafc] dark:bg-dark-bg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- ================================================================= -->
+  <!-- TOP NAVIGATION BAR -->
+  <!-- ================================================================= -->
+  <header class="sticky top-0 z-40 bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md border-b border-slate-200 dark:border-dark-border px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/25">
+        <i data-lucide="book-open-check" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-brand-600 via-indigo-500 to-purple-500 bg-clip-text text-transparent">
+            ResearchMate
+          </h1>
+          <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800/60 rounded-full">
+            v2.0 Pro
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">AI-Powered Research Paper Intelligence & Grounded RAG</p>
+      </div>
+    </div>
+
+    <!-- Quick Status Pills & Controls -->
+    <div class="flex items-center gap-3">
+      <!-- AI Provider Indicator -->
+      <div id="top-ai-badge" class="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-dark-card border border-slate-200 dark:border-dark-border text-slate-700 dark:text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="top-ai-name">Gemini 2.5 Flash</span>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button id="theme-toggle-btn" class="p-2 rounded-lg bg-slate-100 dark:bg-dark-card hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-dark-border transition-colors" title="Toggle Dark/Light Mode">
+        <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+        <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+      </button>
+
+      <!-- User Auth Profile / Login Button -->
+      <div id="auth-header-container">
+        <!-- Dynamic: Populated via JavaScript -->
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================= -->
+  <!-- MAIN LAYOUT (SIDEBAR + CONTENT PANELS) -->
+  <!-- ================================================================= -->
+  <div class="flex-1 flex flex-col md:flex-row max-w-[1680px] w-full mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 gap-6">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-full md:w-64 lg:w-72 flex-shrink-0">
+      <div class="glass-card rounded-2xl p-3 sm:p-4 shadow-sm sticky top-20 flex flex-col gap-1.5">
+        
+        <!-- User Badge Box in Sidebar -->
+        <div id="sidebar-user-box" class="p-3 mb-2 rounded-xl bg-brand-50/50 dark:bg-brand-950/30 border border-brand-100 dark:border-brand-900/50 flex items-center justify-between">
+          <div class="flex items-center gap-2.5 overflow-hidden">
+            <div class="w-8 h-8 rounded-lg bg-brand-600 text-white font-bold flex items-center justify-center text-xs flex-shrink-0" id="user-avatar-initials">
+              RM
+            </div>
+            <div class="overflow-hidden">
+              <div class="text-xs font-bold truncate text-slate-800 dark:text-slate-100" id="user-display-name">Researcher</div>
+              <div class="text-[10px] text-slate-500 dark:text-slate-400 truncate" id="user-display-email">Sign in for cloud sync</div>
+            </div>
+          </div>
+          <button id="auth-modal-trigger-btn" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex-shrink-0">
+            Sign In
+          </button>
+        </div>
+
+        <!-- Navigation Menu Items -->
+        <nav class="flex flex-col gap-1 text-sm font-medium" id="sidebar-nav">
+          <button data-tab="tab-dashboard" class="nav-item active flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+              <span>Dashboard</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-upload" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+              <span>Upload Papers</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-library" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="library" class="w-4 h-4"></i>
+              <span>Paper Library</span>
+            </span>
+            <span id="nav-paper-count" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-slate-200 dark:bg-dark-border text-slate-700 dark:text-slate-300">0</span>
+          </button>
+
+          <div class="my-2 border-t border-slate-200 dark:border-dark-border/80"></div>
+          <div class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Intelligence & Analysis</div>
+
+          <button data-tab="tab-qa" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="message-square-text" class="w-4 h-4"></i>
+              <span>Grounded Q&A (RAG)</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-summary" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="file-text" class="w-4 h-4"></i>
+              <span>Paper Summary (9-Field)</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-compare" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="scale" class="w-4 h-4"></i>
+              <span>Compare Papers</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-gaps" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="microscope" class="w-4 h-4"></i>
+              <span>Research Gaps</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-lit-review" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Literature Review</span>
+            </span>
+          </button>
+
+          <div class="my-2 border-t border-slate-200 dark:border-dark-border/80"></div>
+          <div class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">System & Quality</div>
+
+          <button data-tab="tab-evaluation" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="flask-conical" class="w-4 h-4"></i>
+              <span>Evaluation Studio</span>
+            </span>
+          </button>
+
+          <button data-tab="tab-settings" class="nav-item flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all text-slate-700 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-dark-card hover:text-brand-600 dark:hover:text-brand-400">
+            <span class="flex items-center gap-3">
+              <i data-lucide="settings" class="w-4 h-4"></i>
+              <span>Settings & Diagnostics</span>
+            </span>
+          </button>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 min-w-0">
+
+      <!-- ============================================================= -->
+      <!-- TAB 1: DASHBOARD -->
+      <!-- ============================================================= -->
+      <section id="tab-dashboard" class="tab-pane block space-y-6">
+        <!-- Hero Header -->
+        <div class="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-brand-950 text-white shadow-xl relative overflow-hidden border border-brand-900/40">
+          <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="relative z-10">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 text-xs font-semibold mb-3 border border-brand-400/30">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> State-of-the-Art Research RAG
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Welcome to <span class="bg-gradient-to-r from-brand-400 to-indigo-300 bg-clip-text text-transparent">ResearchMate</span>
+            </h2>
+            <p class="text-slate-300 text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
+              Upload PDF papers to unlock grounded academic Q&A with verifiable citations, 9-field structured summaries, cross-paper comparison matrices, and publication-ready literature reviews.
+            </p>
+          </div>
+        </div>
+
+        <!-- Metric Cards Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Papers Indexed</span>
+              <div class="p-2 rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400">
+                <i data-lucide="book-open" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white" id="stat-papers">0</div>
+            <div class="text-[11px] text-slate-400 mt-1">In your private library</div>
+          </div>
+
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Vector Chunks</span>
+              <div class="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
+                <i data-lucide="database" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white" id="stat-chunks">0</div>
+            <div class="text-[11px] text-slate-400 mt-1">Dense 384-d embeddings</div>
+          </div>
+
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Processed Pages</span>
+              <div class="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                <i data-lucide="file-check" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white" id="stat-pages">0</div>
+            <div class="text-[11px] text-slate-400 mt-1">PyMuPDF structured extraction</div>
+          </div>
+
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+              <span class="text-xs font-semibold uppercase tracking-wider">Cloud Sync</span>
+              <div class="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
+                <i data-lucide="cloud-check" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="text-base sm:text-lg font-bold text-slate-800 dark:text-white truncate" id="stat-cloud">Active</div>
+            <div class="text-[11px] text-slate-400 mt-1">MongoDB & Cloudinary</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions Grid -->
+        <div class="glass-card p-6 rounded-2xl space-y-4">
+          <h3 class="font-bold text-base text-slate-800 dark:text-white flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 text-brand-500"></i> Quick Intelligence Workflows
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button onclick="switchTab('tab-upload')" class="p-4 rounded-xl border border-slate-200 dark:border-dark-border hover:border-brand-500/50 bg-slate-50 dark:bg-dark-card/50 hover:bg-brand-50/50 dark:hover:bg-brand-950/20 text-left transition-all group">
+              <div class="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/60 text-brand-600 dark:text-brand-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+              </div>
+              <div class="font-bold text-sm text-slate-800 dark:text-white">Upload New Paper</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">Drop PDF & automatically index vector embeddings</div>
+            </button>
+
+            <button onclick="switchTab('tab-qa')" class="p-4 rounded-xl border border-slate-200 dark:border-dark-border hover:border-indigo-500/50 bg-slate-50 dark:bg-dark-card/50 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 text-left transition-all group">
+              <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+              </div>
+              <div class="font-bold text-sm text-slate-800 dark:text-white">Ask Grounded Q&A</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">Synthesized answers with verifiable citation links</div>
+            </button>
+
+            <button onclick="switchTab('tab-compare')" class="p-4 rounded-xl border border-slate-200 dark:border-dark-border hover:border-purple-500/50 bg-slate-50 dark:bg-dark-card/50 hover:bg-purple-50/50 dark:hover:bg-purple-950/20 text-left transition-all group">
+              <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                <i data-lucide="scale" class="w-4 h-4"></i>
+              </div>
+              <div class="font-bold text-sm text-slate-800 dark:text-white">Compare Papers</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">10-dimension comparative matrix for multiple papers</div>
+            </button>
+
+            <button onclick="switchTab('tab-lit-review')" class="p-4 rounded-xl border border-slate-200 dark:border-dark-border hover:border-emerald-500/50 bg-slate-50 dark:bg-dark-card/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 text-left transition-all group">
+              <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                <i data-lucide="file-check-2" class="w-4 h-4"></i>
+              </div>
+              <div class="font-bold text-sm text-slate-800 dark:text-white">Literature Review</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">10-section publication-ready scholarly review</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent Uploads Section -->
+        <div class="glass-card p-6 rounded-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-base text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 text-slate-400"></i> Recently Added Research Papers
+            </h3>
+            <button onclick="switchTab('tab-library')" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline">
+              View All in Library →
+            </button>
+          </div>
+          <div id="dashboard-recent-papers" class="divide-y divide-slate-100 dark:divide-dark-border/60">
+            <div class="py-8 text-center text-slate-400 text-sm">
+              <i data-lucide="folder-open" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+              No research papers in library yet. Upload your first PDF to get started!
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 2: UPLOAD PAPERS -->
+      <!-- ============================================================= -->
+      <section id="tab-upload" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="upload-cloud" class="w-5 h-5 text-brand-500"></i> Ingest & Index Research Papers
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Upload academic PDF papers. We extract text per page, chunk semantically, generate vector embeddings, and build BM25 sparse indexes with Cloudinary/MongoDB cloud sync.
+            </p>
+          </div>
+
+          <!-- Drag and Drop Dropzone -->
+          <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-dark-border hover:border-brand-500 dark:hover:border-brand-500 rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer bg-slate-50/50 dark:bg-dark-card/30">
+            <input type="file" id="pdf-file-input" accept="application/pdf" multiple class="hidden" />
+            <div class="w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <i data-lucide="file-up" class="w-8 h-8"></i>
+            </div>
+            <div class="text-base font-semibold text-slate-800 dark:text-white" id="dropzone-text">
+              Click to select or drag and drop PDF research paper(s)
+            </div>
+            <div class="text-xs text-slate-400 mt-1.5">You can select one or multiple PDF papers (Up to 50MB per file)</div>
+            
+            <!-- Selected files badge container -->
+            <div id="selected-files-container" class="hidden mt-4 flex flex-wrap justify-center gap-2 max-h-40 overflow-y-auto p-2">
+            </div>
+          </div>
+
+          <!-- Optional Custom Title (For Single File Upload) -->
+          <div id="upload-custom-title-container" class="space-y-2">
+            <label for="upload-custom-title" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Paper Title (Optional Override)</span>
+              <span id="title-override-hint" class="text-[11px] font-normal lowercase text-slate-400">auto-extracted for batch uploads</span>
+            </label>
+            <input type="text" id="upload-custom-title" placeholder="Leave empty to auto-extract paper title from PDF metadata" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+          </div>
+
+          <!-- Submit Button -->
+          <div class="flex justify-between items-center gap-3">
+            <div id="selected-files-summary" class="text-xs font-medium text-slate-500 dark:text-slate-400"></div>
+            <div class="flex gap-2">
+              <button id="upload-clear-btn" class="hidden px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border hover:bg-slate-100 dark:hover:bg-dark-card text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all">
+                Clear All
+              </button>
+              <button id="upload-submit-btn" disabled class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span id="upload-submit-text">Process & Index Paper</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Progress and Live Logs -->
+          <div id="upload-progress-container" class="hidden space-y-4 pt-4 border-t border-slate-200 dark:border-dark-border">
+            <div class="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span id="upload-status-text">Processing paper...</span>
+              <span id="upload-percentage">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 dark:bg-dark-border rounded-full h-2.5 overflow-hidden">
+              <div id="upload-progress-bar" class="bg-brand-600 h-2.5 rounded-full transition-all duration-300 w-0"></div>
+            </div>
+            <div id="upload-log-box" class="p-3.5 rounded-xl bg-slate-900 text-slate-200 font-mono text-xs space-y-1 max-h-48 overflow-y-auto">
+              <div>[Ready] Awaiting PDF processing...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 3: PAPER LIBRARY -->
+      <!-- ============================================================= -->
+      <section id="tab-library" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 rounded-2xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="library" class="w-5 h-5 text-brand-500"></i> Research Paper Library
+              </h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Manage, inspect, and filter indexed research papers in your private workspace.
+              </p>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="library-search-input" placeholder="Search papers..." class="pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 w-48 sm:w-64" />
+              </div>
+              <button onclick="fetchLibraryPapers()" class="p-2 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-dark-border transition-colors" title="Refresh Library">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Papers Grid -->
+          <div id="library-papers-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <!-- Populated via JS -->
+            <div class="col-span-full py-12 text-center text-slate-400 text-sm">
+              <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto mb-2 text-brand-500"></i>
+              Loading research papers...
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 4: GROUNDED Q&A (RAG) -->
+      <!-- ============================================================= -->
+      <section id="tab-qa" class="tab-pane hidden space-y-6">
+        <div class="glass-card rounded-2xl flex flex-col h-[820px] overflow-hidden border border-slate-200 dark:border-dark-border shadow-md">
+          
+          <!-- Q&A Top Controls Header -->
+          <div class="p-4 bg-slate-50/80 dark:bg-dark-card/60 border-b border-slate-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 flex-1 min-w-[240px]">
+              <div class="w-9 h-9 rounded-xl bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-slate-800 dark:text-white">Grounded Academic Q&A</h3>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Strictly verified against your uploaded paper sources</p>
+              </div>
+            </div>
+
+            <!-- Target Scope & Controls -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <select id="chat-paper-scope" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-surface text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 max-w-[200px] truncate">
+                <option value="">📚 All Papers in Library</option>
+              </select>
+
+              <label class="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 cursor-pointer bg-white dark:bg-dark-surface px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-dark-border">
+                <input type="checkbox" id="chat-reranker-toggle" checked class="rounded text-brand-600 focus:ring-brand-500" />
+                <span>Reranker</span>
+              </label>
+
+              <button id="chat-clear-btn" class="p-1.5 rounded-lg border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-surface text-slate-600 dark:text-slate-400 hover:text-red-500 transition-colors" title="Clear Chat History">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+
+              <button id="chat-export-btn" class="p-1.5 rounded-lg border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-surface text-slate-600 dark:text-slate-400 hover:text-brand-500 transition-colors" title="Export Conversation to Markdown">
+                <i data-lucide="download" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Suggested Query Chips -->
+          <div class="px-4 py-2 bg-brand-50/40 dark:bg-dark-surface/40 border-b border-slate-200 dark:border-dark-border flex items-center gap-2 overflow-x-auto text-xs whitespace-nowrap">
+            <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider flex-shrink-0">Suggested:</span>
+            <button onclick="insertChatPrompt('What is the main contribution and novelty of this paper?')" class="px-2.5 py-1 rounded-md bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border hover:border-brand-500 text-slate-600 dark:text-slate-300 text-xs">
+              💡 Main Contributions
+            </button>
+            <button onclick="insertChatPrompt('What methodology and datasets were used in the evaluation?')" class="px-2.5 py-1 rounded-md bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border hover:border-brand-500 text-slate-600 dark:text-slate-300 text-xs">
+              🔬 Methodology & Benchmarks
+            </button>
+            <button onclick="insertChatPrompt('What are the critical limitations and unaddressed research gaps?')" class="px-2.5 py-1 rounded-md bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border hover:border-brand-500 text-slate-600 dark:text-slate-300 text-xs">
+              ⚠️ Limitations & Gaps
+            </button>
+          </div>
+
+          <!-- Chat Messages Container -->
+          <div id="chat-messages-box" class="flex-1 p-4 sm:p-6 overflow-y-auto space-y-5 bg-white/50 dark:bg-dark-bg/50">
+            <!-- Welcome message -->
+            <div class="flex gap-3">
+              <div class="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center flex-shrink-0 text-xs shadow-md">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+              </div>
+              <div class="max-w-2xl bg-slate-100 dark:bg-dark-card p-4 rounded-2xl rounded-tl-sm text-sm text-slate-800 dark:text-slate-200 shadow-sm border border-slate-200 dark:border-dark-border">
+                <div class="font-bold text-xs text-brand-600 dark:text-brand-400 mb-1">ResearchMate AI</div>
+                <p>Hello! Ask me any technical or empirical question about your indexed research papers. I will provide grounded, synthesized answers accompanied by exact page and section citations.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Bar -->
+          <div class="p-4 bg-white dark:bg-dark-surface border-t border-slate-200 dark:border-dark-border">
+            <form id="chat-form" class="flex gap-2">
+              <input type="text" id="chat-input" placeholder="Ask a research question (e.g. 'How does the proposed attention mechanism reduce complexity?')..." class="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+              <button type="submit" id="chat-send-btn" class="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/25 transition-all">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Ask RAG</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 5: PAPER SUMMARY (9 FIELDS) -->
+      <!-- ============================================================= -->
+      <section id="tab-summary" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="file-text" class="w-5 h-5 text-brand-500"></i> Structured 9-Field Academic Paper Summary
+              </h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Generates rigorous, peer-review grade structured extractions across all 9 critical academic dimensions.
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <select id="summary-paper-select" class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 min-w-[220px]">
+                <option value="">Select a Paper...</option>
+              </select>
+              <button id="generate-summary-btn" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all flex-shrink-0">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span>Generate Summary</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Output Container -->
+          <div id="summary-result-container" class="hidden space-y-4">
+            <div class="flex items-center justify-between p-4 rounded-xl bg-brand-50 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900/60">
+              <div>
+                <h3 class="font-bold text-base text-slate-800 dark:text-white" id="summary-doc-title">Paper Title</h3>
+                <span class="text-xs text-brand-600 dark:text-brand-400 font-medium" id="summary-cached-badge">⚡ Instant Cached Summary</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="regenerateSummary()" class="px-3 py-1.5 rounded-lg border border-brand-300 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 text-xs font-semibold text-brand-700 dark:text-brand-300 hover:bg-brand-100 flex items-center gap-1.5" title="Force fresh generation via Gemini AI">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Regenerate
+                </button>
+                <button onclick="copySummaryToClipboard()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 flex items-center gap-1.5">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy Markdown
+                </button>
+                <button onclick="exportSummaryMarkdown()" class="px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 flex items-center gap-1.5">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i> Export .MD
+                </button>
+              </div>
+            </div>
+
+            <!-- 9 Fields Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="summary-fields-grid">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 6: COMPARE PAPERS -->
+      <!-- ============================================================= -->
+      <section id="tab-compare" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="scale" class="w-5 h-5 text-brand-500"></i> Multi-Paper Comparative Matrix
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Select 2 or more papers to generate a 10-dimensional comparative synthesis table with trade-offs.
+            </p>
+          </div>
+
+          <!-- Paper Selection Checklist -->
+          <div class="space-y-3">
+            <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Select Papers to Compare (Minimum 2)
+            </label>
+            <div id="compare-papers-checklist" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-3 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50/50 dark:bg-dark-card/40">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label for="compare-topic" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Specific Comparison Focus / Theme (Optional)
+            </label>
+            <input type="text" id="compare-topic" placeholder="e.g. 'Efficiency on long-context benchmarks vs baseline transformers'" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+          </div>
+
+          <div class="flex justify-end">
+            <button id="run-compare-btn" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all">
+              <i data-lucide="scale" class="w-4 h-4"></i>
+              <span>Run Comparative Analysis</span>
+            </button>
+          </div>
+
+          <!-- Comparison Result Table -->
+          <div id="compare-result-container" class="hidden space-y-6 pt-4 border-t border-slate-200 dark:border-dark-border">
+            <!-- Output via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 7: RESEARCH GAPS -->
+      <!-- ============================================================= -->
+      <section id="tab-gaps" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="microscope" class="w-5 h-5 text-brand-500"></i> Evidence-Grounded Research Gap Discovery
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Uncover unaddressed technical bottlenecks, methodological voids, evaluation weaknesses, and high-impact prospective directions.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label for="gaps-paper-select" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Target Papers Scope
+              </label>
+              <select id="gaps-paper-select" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100">
+                <option value="">📚 All Papers in Library</option>
+              </select>
+            </div>
+            <div class="space-y-2">
+              <label for="gaps-topic-input" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Domain or Topic Focus (Optional)
+              </label>
+              <input type="text" id="gaps-topic-input" placeholder="e.g. 'Scalability in distributed training & memory footprint'" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button id="run-gaps-btn" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all">
+              <i data-lucide="microscope" class="w-4 h-4"></i>
+              <span>Discover Research Gaps</span>
+            </button>
+          </div>
+
+          <!-- Gap Output Container -->
+          <div id="gaps-result-container" class="hidden space-y-4 pt-4 border-t border-slate-200 dark:border-dark-border">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 8: LITERATURE REVIEW -->
+      <!-- ============================================================= -->
+      <section id="tab-lit-review" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-5 h-5 text-brand-500"></i> Publication-Grade Literature Review Generator
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Generates a comprehensive, 10-section scholarly literature review synthesizing your entire library or specific research themes.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <label for="lit-topic-input" class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Literature Review Theme / Focus Scope
+            </label>
+            <input type="text" id="lit-topic-input" placeholder="e.g. 'Recent Advancements and Benchmarks in Transformer-based RAG Systems'" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+          </div>
+
+          <div class="flex justify-end">
+            <button id="run-lit-btn" class="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Generate 10-Section Literature Review</span>
+            </button>
+          </div>
+
+          <!-- Literature Review Output -->
+          <div id="lit-result-container" class="hidden space-y-4 pt-4 border-t border-slate-200 dark:border-dark-border">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 9: EVALUATION STUDIO -->
+      <!-- ============================================================= -->
+      <section id="tab-evaluation" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="flask-conical" class="w-5 h-5 text-brand-500"></i> Evaluation Studio & Retrieval Benchmarking
+              </h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Benchmark retrieval strategies (Dense vs Sparse vs Hybrid vs Reranked) with Hit@K, MRR, NDCG, Precision, and Recall metrics.
+              </p>
+            </div>
+            <button id="run-benchmark-btn" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm flex items-center gap-2 shadow-md shadow-brand-600/20 transition-all">
+              <i data-lucide="play" class="w-4 h-4"></i>
+              <span>Run Automated Benchmark</span>
+            </button>
+          </div>
+
+          <!-- Evaluation Metrics Chart -->
+          <div class="p-6 rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card/50 space-y-4">
+            <h3 class="font-bold text-sm text-slate-800 dark:text-white">Comparative Retrieval Strategy Performance</h3>
+            <div class="h-64 sm:h-80 w-full relative">
+              <canvas id="eval-benchmark-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Human Evaluation Rating Form -->
+          <div class="p-6 rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card/50 space-y-4">
+            <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="star" class="w-4 h-4 text-amber-500"></i> Log Qualitative Human Rating Record
+            </h3>
+            <form id="human-rating-form" class="space-y-4">
+              <div class="space-y-1.5">
+                <label for="rating-query" class="text-xs font-semibold text-slate-500 dark:text-slate-400">Research Query Evaluated</label>
+                <input type="text" id="rating-query" required placeholder="Enter query evaluated" class="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-xs focus:outline-none focus:ring-1 focus:ring-brand-500" />
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs">
+                <div>
+                  <label class="font-medium text-slate-600 dark:text-slate-300">Correctness (1-5)</label>
+                  <input type="number" id="rate-corr" min="1" max="5" step="0.5" value="5" class="w-full mt-1 p-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card" />
+                </div>
+                <div>
+                  <label class="font-medium text-slate-600 dark:text-slate-300">Relevance (1-5)</label>
+                  <input type="number" id="rate-rel" min="1" max="5" step="0.5" value="5" class="w-full mt-1 p-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card" />
+                </div>
+                <div>
+                  <label class="font-medium text-slate-600 dark:text-slate-300">Completeness (1-5)</label>
+                  <input type="number" id="rate-comp" min="1" max="5" step="0.5" value="5" class="w-full mt-1 p-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card" />
+                </div>
+                <div>
+                  <label class="font-medium text-slate-600 dark:text-slate-300">Citation Quality (1-5)</label>
+                  <input type="number" id="rate-cit" min="1" max="5" step="0.5" value="5" class="w-full mt-1 p-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card" />
+                </div>
+                <div>
+                  <label class="font-medium text-slate-600 dark:text-slate-300">Groundedness (1-5)</label>
+                  <input type="number" id="rate-gnd" min="1" max="5" step="0.5" value="5" class="w-full mt-1 p-2 rounded-lg border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card" />
+                </div>
+              </div>
+              <div>
+                <label for="rating-notes" class="text-xs font-semibold text-slate-500 dark:text-slate-400">Reviewer Notes & Qualitative Feedback</label>
+                <textarea id="rating-notes" rows="2" placeholder="Citations were accurate and matched specific page evidence..." class="w-full mt-1 p-3 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"></textarea>
+              </div>
+              <div class="flex justify-end">
+                <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20">
+                  Save Rating Record
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 10: SETTINGS & DIAGNOSTICS -->
+      <!-- ============================================================= -->
+      <section id="tab-settings" class="tab-pane hidden space-y-6">
+        <div class="glass-card p-6 sm:p-8 rounded-2xl space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i data-lucide="settings" class="w-5 h-5 text-brand-500"></i> Settings & Workspace Diagnostics
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Infrastructure status, AI model configuration, and private workspace data management.
+            </p>
+          </div>
+
+          <!-- Diagnostics Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card/50 space-y-3">
+              <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="cpu" class="w-4 h-4 text-brand-500"></i> AI & Vector Intelligence
+              </h3>
+              <div class="text-xs space-y-2 text-slate-600 dark:text-slate-300">
+                <div class="flex justify-between"><span>LLM Provider:</span> <span class="font-semibold text-brand-600 dark:text-brand-400" id="diag-llm-provider">Gemini</span></div>
+                <div class="flex justify-between"><span>LLM Model:</span> <span class="font-mono text-[11px]" id="diag-llm-model">gemini-2.5-flash</span></div>
+                <div class="flex justify-between"><span>Dense Embeddings:</span> <span class="font-mono text-[11px]">all-MiniLM-L6-v2 (384-d)</span></div>
+                <div class="flex justify-between"><span>Sparse Index:</span> <span class="font-semibold text-emerald-600">BM25 (Rank-BM25)</span></div>
+                <div class="flex justify-between"><span>Cross-Encoder:</span> <span class="font-mono text-[11px]" id="diag-reranker-model">ms-marco-MiniLM-L-6-v2</span></div>
+              </div>
+            </div>
+
+            <div class="p-5 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card/50 space-y-3">
+              <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="cloud" class="w-4 h-4 text-brand-500"></i> Cloud Storage & Persistence
+              </h3>
+              <div class="text-xs space-y-2 text-slate-600 dark:text-slate-300">
+                <div class="flex justify-between"><span>MongoDB Atlas:</span> <span class="font-semibold text-emerald-600" id="diag-mongo-status">Connected</span></div>
+                <div class="flex justify-between"><span>Cloudinary PDF Storage:</span> <span class="font-semibold" id="diag-cloudinary-status">Active</span></div>
+                <div class="flex justify-between"><span>Local Fallback Cache:</span> <span class="text-slate-400">Ready</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danger Zone: Reset Library -->
+          <div class="p-5 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 space-y-3">
+            <h3 class="font-bold text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i> Danger Zone: Reset My Library
+            </h3>
+            <p class="text-xs text-red-600/80 dark:text-red-400/80">
+              Clears only your uploaded research papers, vector embeddings in ChromaDB, and sparse BM25 indexes. This action is irreversible.
+            </p>
+            <button onclick="confirmResetLibrary()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-all shadow-md shadow-red-600/20">
+              Reset My Library Data
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- AUTHENTICATION MODAL -->
+  <!-- ================================================================= -->
+  <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 relative border border-slate-200 dark:border-dark-border">
+      <button onclick="closeAuthModal()" class="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-brand-500/30">
+          <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-xl font-extrabold text-slate-800 dark:text-white" id="auth-modal-title">Sign In to ResearchMate</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Access your private multi-tenant research library</p>
+      </div>
+
+      <!-- Tab Switcher (Sign In vs Register) -->
+      <div class="flex p-1 rounded-xl bg-slate-100 dark:bg-dark-card border border-slate-200 dark:border-dark-border text-xs font-semibold">
+        <button id="auth-tab-signin" onclick="setAuthTab('signin')" class="flex-1 py-2 rounded-lg bg-white dark:bg-brand-600 text-slate-800 dark:text-white shadow-sm transition-all">
+          Sign In
+        </button>
+        <button id="auth-tab-register" onclick="setAuthTab('register')" class="flex-1 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Auth Form -->
+      <form id="auth-form" class="space-y-4">
+        <div id="auth-name-field" class="hidden space-y-1">
+          <label for="auth-fullname" class="text-xs font-semibold text-slate-600 dark:text-slate-300">Full Name</label>
+          <input type="text" id="auth-fullname" placeholder="Dr. Jane Doe" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+        </div>
+
+        <div class="space-y-1">
+          <label for="auth-email" class="text-xs font-semibold text-slate-600 dark:text-slate-300">Email Address</label>
+          <input type="email" id="auth-email" required placeholder="researcher@university.edu" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+        </div>
+
+        <div class="space-y-1">
+          <label for="auth-password" class="text-xs font-semibold text-slate-600 dark:text-slate-300">Password</label>
+          <input type="password" id="auth-password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-50 dark:bg-dark-card text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-100" />
+        </div>
+
+        <button type="submit" id="auth-submit-btn" class="w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-md shadow-brand-600/25 transition-all flex items-center justify-center gap-2">
+          <span>Sign In</span>
+        </button>
+
+        <!-- Quick Demo Account Fill -->
+        <div class="pt-2 border-t border-slate-200 dark:border-dark-border text-center">
+          <button type="button" onclick="fillDemoCredentials()" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center justify-center gap-1.5 mx-auto">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Use Demo Account (researcher@local / password123)</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- PAPER READER & INSPECTION MODAL -->
+  <!-- ================================================================= -->
+  <div id="paper-reader-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-4xl w-full h-[85vh] rounded-2xl p-6 shadow-2xl flex flex-col space-y-4 relative border border-slate-200 dark:border-dark-border overflow-hidden">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-dark-border">
+        <div class="flex items-center gap-3 overflow-hidden">
+          <div class="p-2 rounded-xl bg-brand-100 dark:bg-brand-900/60 text-brand-600 dark:text-brand-400">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+          </div>
+          <div class="overflow-hidden">
+            <h3 class="font-bold text-base text-slate-800 dark:text-white truncate" id="reader-modal-title">Paper Details</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400" id="reader-modal-meta">Pages & Chunks breakdown</p>
+          </div>
+        </div>
+        <button onclick="closeReaderModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Reader Modal Content Tabs -->
+      <div class="flex gap-2 border-b border-slate-200 dark:border-dark-border pb-2 text-xs font-semibold">
+        <button id="reader-tab-pages" onclick="setReaderSubTab('pages')" class="px-3 py-1.5 rounded-lg bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300">
+          📄 Extracted Pages
+        </button>
+        <button id="reader-tab-chunks" onclick="setReaderSubTab('chunks')" class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+          🧩 Vector Chunks Preview
+        </button>
+        <a id="reader-pdf-link" href="#" target="_blank" class="hidden ml-auto px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 items-center gap-1.5">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open Cloud PDF
+        </a>
+      </div>
+
+      <!-- Viewer Body -->
+      <div id="reader-modal-body" class="flex-1 overflow-y-auto space-y-4 p-2 text-sm">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <!-- ================================================================= -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Application Logic -->
+  <script src="/static/js/app.js"></script>
+  <script>
+    // Initialize Lucide icons on DOM load
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

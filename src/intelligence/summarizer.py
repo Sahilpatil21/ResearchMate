@@ -112,6 +112,65 @@ CRITICAL RULES:
 """
 
 
+import re
+
+def _extract_json_dict(text: str) -> Optional[Dict[str, Any]]:
+    """Robustly extract dictionary from LLM output across codeblocks, braces, and key patterns."""
+    if not text:
+        return None
+    raw = text.strip()
+
+    # 1. Direct JSON parse
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    # 2. Markdown fenced json: ```json ... ``` or ``` ... ```
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+    if m:
+        try:
+            data = json.loads(m.group(1).strip())
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    # 3. Outermost curly braces { ... }
+    m = re.search(r"(\{.*\})", raw, re.DOTALL)
+    if m:
+        try:
+            data = json.loads(m.group(1).strip())
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    # 4. Key-by-key regex fallback for 9 standard fields
+    keys = [
+        "research_problem", "objective", "methodology", "dataset",
+        "model_architecture", "experimental_setup", "main_results",
+        "limitations", "conclusion"
+    ]
+    extracted = {}
+    for key in keys:
+        pattern = rf'"{key}"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"'
+        km = re.search(pattern, raw, re.IGNORECASE)
+        if km:
+            try:
+                val = km.group(1).encode("utf-8").decode("unicode_escape", errors="replace")
+                extracted[key] = val.strip()
+            except Exception:
+                extracted[key] = km.group(1).strip()
+
+    if len(extracted) >= 3:
+        return extracted
+
+    return None
+
+
 class PaperSummarizer:
     """Extracts structured 9-field academic summaries from indexed research papers."""
 
@@ -150,13 +209,15 @@ class PaperSummarizer:
         user_cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = user_cache_dir / f"{document_id}_summary.json"
 
-        # Check persistent cache
+        # Check persistent cache (reject corrupted/failed placeholder summaries)
         if not force_refresh and cache_file.exists():
             try:
                 data = json.loads(cache_file.read_text(encoding="utf-8"))
-                summary = PaperSummary.model_validate(data)
-                summary.is_cached = True
-                return summary
+                prob = data.get("research_problem", "")
+                if prob and not prob.startswith("Extraction failed") and prob != "Extraction failed.":
+                    summary = PaperSummary.model_validate(data)
+                    summary.is_cached = True
+                    return summary
             except Exception:
                 pass
 
@@ -186,16 +247,38 @@ class PaperSummarizer:
             for r in results:
                 candidate_map[r.chunk_id] = r
 
-
         retrieved_results = list(candidate_map.values())
 
+        # Fallback to direct document chunks if retrieval yielded few or no results
+        if len(retrieved_results) < 2:
+            from src.utils.file_utils import load_document_chunks
+            direct_chunks = load_document_chunks(document_id, user_id=user_id)
+            if direct_chunks:
+                from src.models.retrieval import RetrievalResult
+                for rank, c in enumerate(direct_chunks[:12], start=1):
+                    if c.chunk_id not in candidate_map:
+                        res = RetrievalResult(
+                            chunk_id=c.chunk_id,
+                            document_id=c.document_id,
+                            filename=doc.metadata.filename if doc else f"{document_id}.pdf",
+                            page_number=c.page_number,
+                            section=c.section,
+                            chunk_index=c.chunk_index,
+                            text=c.text,
+                            score=1.0,
+                            dense_score=1.0,
+                            dense_rank=rank,
+                            retrieval_method="dense",
+                        )
+                        retrieved_results.append(res)
+                        candidate_map[c.chunk_id] = res
+
         if not retrieved_results:
-            # Fallback if unindexed or no text found
             return PaperSummary(
                 document_id=document_id,
                 paper_title=paper_title,
                 filename=filename,
-                research_problem="Not reported in the paper (No indexed text available).",
+                research_problem="No indexed text available for this paper. Please ensure the PDF was processed.",
                 objective="Not reported in the paper.",
                 methodology="Not reported in the paper.",
                 dataset="Not reported in the paper.",
@@ -213,7 +296,7 @@ class PaperSummarizer:
             document_map={document_id: doc} if doc else None,
         )
 
-        context_str = self.context_builder.build_context_from_citations(citations, max_chars=12000)
+        context_str = self.context_builder.build_context_from_citations(citations, max_chars=14000)
 
         user_prompt = (
             f"Please generate a comprehensive 9-field academic summary for the paper '{paper_title}' ({filename}).\n\n"
@@ -222,7 +305,6 @@ class PaperSummarizer:
         )
 
         if not self.llm_provider.is_available():
-            # Graceful unconfigured fallback
             return PaperSummary(
                 document_id=document_id,
                 paper_title=paper_title,
@@ -246,48 +328,14 @@ class PaperSummarizer:
             temperature=0.0,
         )
 
-        try:
-            raw_text = resp.text.strip()
-            # Strip markdown json code block tags if present
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            if raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-
-            parsed = json.loads(raw_text.strip())
-
-            summary = PaperSummary(
+        if not resp.is_success:
+            return PaperSummary(
                 document_id=document_id,
                 paper_title=paper_title,
                 filename=filename,
-                research_problem=parsed.get("research_problem", "Not reported in the paper."),
-                objective=parsed.get("objective", "Not reported in the paper."),
-                methodology=parsed.get("methodology", "Not reported in the paper."),
-                dataset=parsed.get("dataset", "Not reported in the paper."),
-                model_architecture=parsed.get("model_architecture", "Not reported in the paper."),
-                experimental_setup=parsed.get("experimental_setup", "Not reported in the paper."),
-                main_results=parsed.get("main_results", "Not reported in the paper."),
-                limitations=parsed.get("limitations", "Not reported in the paper."),
-                conclusion=parsed.get("conclusion", "Not reported in the paper."),
-                citations=citations,
-                is_cached=False,
-            )
-
-            # Save to persistent cache
-            cache_file.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
-            return summary
-
-        except Exception:
-            # Fallback if json parse fails
-            summary = PaperSummary(
-                document_id=document_id,
-                paper_title=paper_title,
-                filename=filename,
-                research_problem=resp.text if resp.is_success else "Extraction failed.",
-                objective="Extracted in main problem overview above.",
-                methodology="See research text above.",
+                research_problem=f"Failed to generate summary: {resp.error or 'LLM request failed.'}",
+                objective="Please click 'Regenerate' to retry summary generation.",
+                methodology="Not reported in the paper.",
                 dataset="Not reported in the paper.",
                 model_architecture="Not reported in the paper.",
                 experimental_setup="Not reported in the paper.",
@@ -297,4 +345,48 @@ class PaperSummarizer:
                 citations=citations,
                 is_cached=False,
             )
+
+        parsed = _extract_json_dict(resp.text)
+        if parsed and isinstance(parsed, dict):
+            summary = PaperSummary(
+                document_id=document_id,
+                paper_title=paper_title,
+                filename=filename,
+                research_problem=parsed.get("research_problem") or parsed.get("core_objective") or "Not reported in the paper.",
+                objective=parsed.get("objective") or parsed.get("contributions") or "Not reported in the paper.",
+                methodology=parsed.get("methodology") or "Not reported in the paper.",
+                dataset=parsed.get("dataset") or parsed.get("datasets_benchmarks") or "Not reported in the paper.",
+                model_architecture=parsed.get("model_architecture") or parsed.get("mathematical_formulations") or "Not reported in the paper.",
+                experimental_setup=parsed.get("experimental_setup") or parsed.get("practical_implications") or "Not reported in the paper.",
+                main_results=parsed.get("main_results") or parsed.get("key_findings") or "Not reported in the paper.",
+                limitations=parsed.get("limitations") or parsed.get("critical_limitations") or "Not reported in the paper.",
+                conclusion=parsed.get("conclusion") or parsed.get("future_directions") or "Not reported in the paper.",
+                citations=citations,
+                is_cached=False,
+            )
+
+            # Save valid summary to persistent cache
+            try:
+                cache_file.write_text(summary.model_dump_json(indent=2), encoding="utf-8")
+            except Exception:
+                pass
             return summary
+
+        # Fallback parsing for non-JSON formatted text
+        summary = PaperSummary(
+            document_id=document_id,
+            paper_title=paper_title,
+            filename=filename,
+            research_problem=resp.text.strip(),
+            objective="Included in research synthesis above.",
+            methodology="Included in research synthesis above.",
+            dataset="Included in research synthesis above.",
+            model_architecture="Included in research synthesis above.",
+            experimental_setup="Included in research synthesis above.",
+            main_results="Included in research synthesis above.",
+            limitations="Included in research synthesis above.",
+            conclusion="Included in research synthesis above.",
+            citations=citations,
+            is_cached=False,
+        )
+        return summary

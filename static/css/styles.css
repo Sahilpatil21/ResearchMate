@@ -1,0 +1,185 @@
+/* Custom animations and styling enhancements for ResearchMate */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+code, pre {
+  font-family: var(--font-mono);
+}
+
+/* Glassmorphic card styling */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* Glow effects */
+.glow-brand {
+  box-shadow: 0 0 25px -5px rgba(79, 70, 229, 0.35);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.35);
+}
+
+/* Markdown prose rendering styles */
+.prose-content h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.prose-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.65;
+}
+
+.prose-content ul {
+  list-style-type: disc;
+  padding-left: 1.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-content ol {
+  list-style-type: decimal;
+  padding-left: 1.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-content li {
+  margin-bottom: 0.35rem;
+}
+
+.prose-content blockquote {
+  border-left: 4px solid #6366f1;
+  padding-left: 1rem;
+  font-style: italic;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 0 6px 6px 0;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+.prose-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.prose-content th, .prose-content td {
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+}
+
+.dark .prose-content th, .dark .prose-content td {
+  border-color: rgba(51, 65, 85, 0.8);
+}
+
+.prose-content th {
+  background-color: rgba(241, 245, 249, 0.7);
+  font-weight: 600;
+}
+
+.dark .prose-content th {
+  background-color: rgba(30, 41, 59, 0.7);
+}
+
+.prose-content pre {
+  background-color: #0f172a;
+  color: #f8fafc;
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.88rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-content code:not(pre code) {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+}
+
+.dark .prose-content code:not(pre code) {
+  background-color: rgba(129, 140, 248, 0.15);
+  color: #a5b4fc;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 2s infinite ease-in-out;
+}

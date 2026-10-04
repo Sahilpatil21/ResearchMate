@@ -37,8 +37,8 @@ class GeminiProvider(BaseLLMProvider):
         self.model_name = (
             model_name
             if model_name is not None
-            else os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        ).strip() or "gemini-2.5-flash"
+            else os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        ).strip() or "gemini-3.5-flash"
         self._client = None
 
     def is_available(self) -> bool:
@@ -100,65 +100,91 @@ class GeminiProvider(BaseLLMProvider):
             )
 
         start_time = time.perf_counter()
+        last_error = ""
 
-        try:
-            client = self._get_client()
+        # Cascade through active models if primary model hits 429 quota exhaustion
+        candidate_models = [self.model_name]
+        for fallback in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.7-flash"]:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
 
-            # 1. New google.genai Client invocation
-            if hasattr(client, "models") and hasattr(client.models, "generate_content"):
-                config = {}
-                if system_instruction:
-                    config["system_instruction"] = system_instruction
-                if temperature is not None:
-                    config["temperature"] = temperature
+        for current_model in candidate_models:
+            max_retries = 2
+            backoff = 1.0
 
-                response = client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config if config else None,
-                )
-                generated_text = response.text if hasattr(response, "text") and response.text else ""
+            for attempt in range(max_retries):
+                try:
+                    client = self._get_client()
+                    generated_text = ""
 
-            # 2. Legacy google.generativeai fallback
-            else:
-                model = client.GenerativeModel(
-                    model_name=self.model_name,
-                    system_instruction=system_instruction,
-                    generation_config={"temperature": temperature},
-                )
-                response = model.generate_content(prompt)
-                generated_text = response.text if hasattr(response, "text") and response.text else ""
+                    # 1. New google.genai Client invocation
+                    if hasattr(client, "models") and hasattr(client.models, "generate_content"):
+                        config = {}
+                        if system_instruction:
+                            config["system_instruction"] = system_instruction
+                        if temperature is not None:
+                            config["temperature"] = temperature
 
-            elapsed = round(time.perf_counter() - start_time, 3)
+                        response = client.models.generate_content(
+                            model=current_model,
+                            contents=prompt,
+                            config=config if config else None,
+                        )
+                        generated_text = response.text if hasattr(response, "text") and response.text else ""
 
-            if not generated_text:
-                return LLMResponse(
-                    text="",
-                    model_name=self.model_name,
-                    provider_name=self.get_provider_name(),
-                    latency_seconds=elapsed,
-                    error="Gemini returned an empty response. The content may have been filtered or blocked by safety guidelines.",
-                )
+                    # 2. Legacy google.generativeai fallback
+                    else:
+                        model = client.GenerativeModel(
+                            model_name=current_model,
+                            system_instruction=system_instruction,
+                            generation_config={"temperature": temperature},
+                        )
+                        response = model.generate_content(prompt)
+                        generated_text = response.text if hasattr(response, "text") and response.text else ""
 
-            return LLMResponse(
-                text=generated_text,
-                model_name=self.model_name,
-                provider_name=self.get_provider_name(),
-                latency_seconds=elapsed,
-            )
+                    elapsed = round(time.perf_counter() - start_time, 3)
 
-        except Exception as e:
-            elapsed = round(time.perf_counter() - start_time, 3)
-            err_msg = str(e)
-            
-            # Mask any accidental key reflection
-            if self.api_key and self.api_key in err_msg:
-                err_msg = err_msg.replace(self.api_key, "[REDACTED_API_KEY]")
+                    if not generated_text:
+                        if attempt < max_retries - 1:
+                            time.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        # Try next model in cascade
+                        break
 
-            return LLMResponse(
-                text="",
-                model_name=self.model_name,
-                provider_name=self.get_provider_name(),
-                latency_seconds=elapsed,
-                error=f"Gemini API Error: {err_msg}",
-            )
+                    return LLMResponse(
+                        text=generated_text,
+                        model_name=current_model,
+                        provider_name=self.get_provider_name(),
+                        latency_seconds=elapsed,
+                    )
+
+                except Exception as e:
+                    err_msg = str(e)
+                    if self.api_key and self.api_key in err_msg:
+                        err_msg = err_msg.replace(self.api_key, "[REDACTED_API_KEY]")
+                    last_error = err_msg
+
+                    # If model quota exhausted (429), break inner retry and try next candidate model
+                    if "429" in err_msg or "resource_exhausted" in err_msg.lower() or "quota" in err_msg.lower():
+                        break
+
+                    # If transient 503 error, retry
+                    is_transient = any(
+                        code in err_msg.lower()
+                        for code in ["503", "unavailable", "timeout", "connection reset", "overloaded"]
+                    )
+                    if is_transient and attempt < max_retries - 1:
+                        time.sleep(backoff)
+                        backoff *= 2
+                        continue
+                    break
+
+        elapsed = round(time.perf_counter() - start_time, 3)
+        return LLMResponse(
+            text="",
+            model_name=self.model_name,
+            provider_name=self.get_provider_name(),
+            latency_seconds=elapsed,
+            error=f"Gemini API Error: {last_error}",
+        )

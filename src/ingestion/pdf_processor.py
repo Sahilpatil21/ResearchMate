@@ -40,6 +40,8 @@ class PDFProcessor:
         file_input: Union[str, Path, bytes],
         filename: Optional[str] = None,
         storage_filename: Optional[str] = None,
+        user_id: Optional[str] = None,
+        document_title: Optional[str] = None,
     ) -> Document:
         """Process a PDF file from a path or raw bytes.
 
@@ -47,6 +49,8 @@ class PDFProcessor:
             file_input: Path to PDF file or raw bytes.
             filename: Original uploaded filename (used as fallback for metadata).
             storage_filename: Name used when saved on disk.
+            user_id: Optional owner user ID for multi-tenant isolation.
+            document_title: Optional custom paper title override.
 
         Returns:
             A structured Document instance.
@@ -55,6 +59,11 @@ class PDFProcessor:
             PDFProcessingError: If the PDF cannot be opened, is corrupted, or has no pages.
         """
         raw_bytes: bytes
+        if isinstance(file_input, tuple):
+            if len(file_input) > 1 and not storage_filename:
+                storage_filename = str(file_input[1])
+            file_input = file_input[0]
+
         if isinstance(file_input, (str, Path)):
             path = Path(file_input)
             if not path.exists():
@@ -95,7 +104,8 @@ class PDFProcessor:
                 raise PDFProcessingError("PDF document contains 0 pages.")
 
             # Extract metadata heuristics
-            title, authors = self._extract_metadata(doc, fallback_name=orig_name)
+            extracted_title, authors = self._extract_metadata(doc, fallback_name=orig_name)
+            final_title = document_title.strip() if document_title else extracted_title
 
             # Extract pages
             pages = self._extract_pages(doc)
@@ -109,7 +119,7 @@ class PDFProcessor:
                 document_id=doc_id,
                 filename=stored_name,
                 original_filename=orig_name,
-                title=title,
+                title=final_title,
                 authors=authors,
                 page_count=len(pages),
                 total_pages_in_pdf=total_pages,
@@ -117,12 +127,30 @@ class PDFProcessor:
                 file_size_bytes=file_size,
                 has_extractable_text=has_extractable_text,
                 sha256_hash=sha256_hash,
+                user_id=user_id,
             )
 
             return Document(metadata=doc_metadata, pages=pages)
 
         finally:
             doc.close()
+
+    def process_pdf(
+        self,
+        file_input: Union[str, Path, bytes],
+        filename: Optional[str] = None,
+        storage_filename: Optional[str] = None,
+        user_id: Optional[str] = None,
+        document_title: Optional[str] = None,
+    ) -> Document:
+        """Alias for process_file to support process_pdf signature."""
+        return self.process_file(
+            file_input=file_input,
+            filename=filename,
+            storage_filename=storage_filename,
+            user_id=user_id,
+            document_title=document_title,
+        )
 
     def _extract_pages(self, doc: fitz.Document) -> List[Page]:
         """Extract text from each page preserving 1-indexed page numbering."""

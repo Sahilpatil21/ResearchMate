@@ -49,6 +49,21 @@ class AuthService:
         self._local_auth_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._init_connection()
+        self._ensure_default_user()
+
+    def _ensure_default_user(self) -> None:
+        """Seed default local researcher account if not present."""
+        try:
+            demo_email = "researcher@local"
+            user = self.get_user_by_email(demo_email)
+            if not user:
+                self.register_user(
+                    email=demo_email,
+                    password="password123",
+                    full_name="Lead Researcher",
+                )
+        except Exception:
+            pass
 
     def _init_connection(self) -> None:
         """Attempt to connect to MongoDB with a short timeout."""

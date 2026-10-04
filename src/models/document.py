@@ -146,6 +146,16 @@ class Document(BaseModel):
         return len(self.pages)
 
     @property
+    def pdf_url(self) -> Optional[str]:
+        """Shortcut to Cloudinary / storage PDF URL."""
+        return self.metadata.cloudinary_url
+
+    @pdf_url.setter
+    def pdf_url(self, url: Optional[str]) -> None:
+        """Setter for Cloudinary / storage PDF URL."""
+        self.metadata.cloudinary_url = url
+
+    @property
     def total_words(self) -> int:
         """Calculate total words across all extracted pages."""
         return sum(page.word_count for page in self.pages)

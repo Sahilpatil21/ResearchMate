@@ -217,3 +217,14 @@ class RetrievalEvaluator:
             method_summaries=method_summaries,
             detailed_query_results=flat_detailed,
         )
+
+    def evaluate_all_methods(
+        self,
+        top_k: int = 5,
+        candidate_k: int = 20,
+        methods: Optional[List[str]] = None,
+        user_id: Optional[str] = None,
+    ) -> RetrievalEvaluationReport:
+        """Alias for run_full_benchmark."""
+        return self.run_full_benchmark(top_k=top_k, candidate_k=candidate_k, methods=methods)
+

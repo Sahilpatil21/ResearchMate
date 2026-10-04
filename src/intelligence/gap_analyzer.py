@@ -119,20 +119,32 @@ class ResearchGapAnalyzer:
         self.llm_provider = llm_provider or get_llm_provider()
         self.context_builder = context_builder or ContextBuilder()
 
-    def analyze_gaps(self, document_ids: List[str], user_id: Optional[str] = None) -> ResearchGapReport:
+    def analyze_gaps(
+        self,
+        document_ids: Optional[List[str]] = None,
+        topic: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ResearchGapReport:
         """Execute research gap discovery across selected documents.
 
         Args:
-            document_ids: List of document IDs to analyze.
+            document_ids: Optional list of document IDs to analyze (defaults to all user documents).
+            topic: Optional domain/topic focus.
             user_id: Optional user identifier for multi-tenant isolation.
 
         Returns:
             ResearchGapReport instance.
         """
+        # Resolve document_ids if not provided
+        if not document_ids:
+            from src.utils.file_utils import load_all_processed_documents
+            all_docs = load_all_processed_documents(user_id=user_id)
+            document_ids = [d.document_id for d in all_docs]
+
         if not document_ids:
             return ResearchGapReport(
                 document_ids=[],
-                executive_summary="No papers selected for gap analysis.",
+                executive_summary="No papers found in your library for gap analysis. Please upload research papers first.",
                 gaps=[],
                 citations=[],
             )
@@ -143,6 +155,8 @@ class ResearchGapAnalyzer:
             "Future work, open problems, unaddressed challenges, and ethical concerns",
             "Dataset bias, generalizability constraints, and missing comparative baselines",
         ]
+        if topic and topic.strip():
+            queries.insert(0, f"Limitations and research gaps regarding: {topic.strip()}")
 
         candidate_map = {}
         for doc_id in document_ids:
@@ -158,7 +172,6 @@ class ResearchGapAnalyzer:
                 )
                 for r in results:
                     candidate_map[r.chunk_id] = r
-
 
         retrieved_results = list(candidate_map.values())
 
@@ -176,8 +189,10 @@ class ResearchGapAnalyzer:
 
         context_str = self.context_builder.build_context_from_citations(citations, max_chars=14000)
 
+        topic_instruction = f" Focus specifically on: {topic.strip()}." if topic and topic.strip() else ""
+
         prompt = (
-            f"Analyze the following {len(document_ids)} papers for potential research gaps, limitations, and future directions:\n\n"
+            f"Analyze the following {len(document_ids)} papers for potential research gaps, limitations, and future directions.{topic_instruction}\n\n"
             f"### RETRIEVED RESEARCH CONTEXT ###\n{context_str}\n\n"
             f"Extract structured research gaps with supporting evidence and future directions."
         )

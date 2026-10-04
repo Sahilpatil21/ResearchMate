@@ -40,6 +40,36 @@ class PaperComparisonReport(BaseModel):
     )
     comparative_synthesis: str = Field(..., description="High-level narrative synthesis contrasting approaches")
     citations: List[Citation] = Field(default_factory=list, description="Source citations backing the comparisons")
+    topic: Optional[str] = Field(default=None, description="Optional comparison focus topic")
+
+    @property
+    def comparison_matrix(self) -> List[Dict[str, Any]]:
+        """Return matrix format for UI table rendering: [{dimension, values: {paper: text}}]."""
+        matrix = []
+        for dimension, paper_map in self.comparison_table.items():
+            matrix.append({
+                "dimension": dimension,
+                "values": paper_map,
+            })
+        return matrix
+
+    @property
+    def papers_compared(self) -> List[str]:
+        """Alias for paper_titles."""
+        return self.paper_titles
+
+    @property
+    def synthesis(self) -> str:
+        """Alias for comparative_synthesis."""
+        return self.comparative_synthesis
+
+    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+        """Custom dump providing both original and frontend-friendly alias keys."""
+        data = super().model_dump(**kwargs)
+        data["comparison_matrix"] = self.comparison_matrix
+        data["papers_compared"] = self.papers_compared
+        data["synthesis"] = self.synthesis
+        return data
 
     def to_dataframe_dict(self) -> List[Dict[str, Any]]:
         """Convert comparative table into a list of row dicts for tabular rendering."""
@@ -79,11 +109,17 @@ class PaperComparator:
             llm_provider=self.llm_provider,
         )
 
-    def compare_papers(self, document_ids: List[str], user_id: Optional[str] = None) -> PaperComparisonReport:
+    def compare_papers(
+        self,
+        document_ids: List[str],
+        topic: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> PaperComparisonReport:
         """Execute multi-paper comparison for 2 to 5 documents.
 
         Args:
             document_ids: List of document IDs (between 2 and 5).
+            topic: Optional comparison focus / angle.
             user_id: Optional user identifier for multi-tenant isolation.
 
         Returns:
@@ -96,6 +132,7 @@ class PaperComparator:
                 comparison_table={},
                 comparative_synthesis="No papers selected for comparison.",
                 citations=[],
+                topic=topic,
             )
 
         # 1. Fetch structured summaries for each paper
@@ -108,7 +145,6 @@ class PaperComparator:
             summaries.append(summary)
             paper_titles.append(summary.paper_title)
             all_citations.extend(summary.citations)
-
 
         # 2. Build 10-dimension comparison table
         dimensions = [
@@ -146,9 +182,12 @@ class PaperComparator:
 
         joint_context = "\n---\n".join(context_parts)
 
+        topic_clause = f"\nSpecific Comparison Focus / Theme: {topic}\n" if topic else ""
+
         prompt = (
             f"Compare and contrast the following {len(summaries)} research papers:\n\n"
             f"{joint_context}\n\n"
+            f"{topic_clause}"
             f"Provide a structured 3-paragraph comparative synthesis highlighting key differences in methodology, empirical results, and practical trade-offs."
         )
 
@@ -176,4 +215,6 @@ class PaperComparator:
             comparison_table=table,
             comparative_synthesis=synthesis_text,
             citations=dedup_citations,
+            topic=topic,
         )
+
